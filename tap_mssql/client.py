@@ -12,6 +12,7 @@ from typing import Any, Dict, Iterable, Optional
 
 import pendulum
 import pyodbc
+import pymssql
 
 import sqlalchemy
 from sqlalchemy.engine import URL
@@ -38,12 +39,12 @@ class mssqlConnector(SQLConnector):
 
     def get_sqlalchemy_url(cls, config: dict) -> str:
         """Concatenate a SQLAlchemy URL for use in connecting to the source."""
-        if config['dialect'] == "mssql":
-            url_drivername:str = config['dialect']
-        else:
-            cls.logger.error("Invalid dialect given")
-            exit(1)
-
+        # if config['dialect'] == "mssql":
+        #     url_drivername:str =  "mssql"  #config['dialect']
+        # else:
+        #     cls.logger.error("Invalid dialect given")
+        #     exit(1)
+        url_drivername:str =  "mssql"  #config['dialect']
         if config['driver_type'] in ["pyodbc", "pymssql"]:
             url_drivername += f"+{config['driver_type']}"
         else:
@@ -63,6 +64,8 @@ class mssqlConnector(SQLConnector):
         
         if 'sqlalchemy_url_query' in config:
             config_url = config_url.update_query_dict(config['sqlalchemy_url_query'])
+        elif 'sqlalchemy_url_query' not in config and config['driver_type']=="pyodbc":
+            config_url=config_url.update_query_dict({"driver": "ODBC Driver 18 for SQL Server","TrustServerCertificate": "yes"})
         
         return (config_url)
 
@@ -105,6 +108,9 @@ class mssqlConnector(SQLConnector):
         
         if str(sql_type) in ["MONEY", "SMALLMONEY"]:
             sql_type = "number"
+
+        if str(sql_type) in ["TINYINT"]:
+            sql_type = "int"
             
         return SQLConnector.to_jsonschema_type(sql_type)
 
@@ -158,43 +164,61 @@ class mssqlStream(SQLStream):
         # This is helpful if the source database provides batch-optimized record
         # retrieval.
         # If no overrides or optimizations are needed, you may delete this method.
-        yield from super().get_records(partition)
+        if partition:
+            raise NotImplementedError(
+                f"Stream '{self.name}' does not support partitioning."
+            )
+        
+        table = self.connector.get_table(self.fully_qualified_name)
+        query = table.select()
+        if self.replication_key:
+            replication_key_col = table.columns[self.replication_key]
+            query = query.order_by(replication_key_col)
 
-    def get_batches(
-        self,
-        batch_config: BatchConfig,
-        context: dict | None = None,
-        ) -> Iterable[tuple[BaseBatchFileEncoding, list[str]]]:
-        """Batch generator function.
+            start_val = self.get_starting_replication_key_value(partition)
+            if start_val:
+                query = query.filter(replication_key_col >= start_val)
 
-        Developers are encouraged to override this method to customize batching
-        behavior for databases, bulk APIs, etc.
+        for row in self.connector.connection.execute(query):
+            yield dict(row)
 
-        Args:
-            batch_config: Batch config for this stream.
-            context: Stream partition or context dictionary.
+        #yield from super().get_records(partition)
 
-        Yields:
-            A tuple of (encoding, manifest) for each batch.
-        """
-        sync_id = f"{self.tap_name}--{self.name}-{uuid4()}"
-        prefix = batch_config.storage.prefix or ""
+    # def get_batches(
+    #     self,
+    #     batch_config: BatchConfig,
+    #     context: dict | None = None,
+    #     ) -> Iterable[tuple[BaseBatchFileEncoding, list[str]]]:
+    #     """Batch generator function.
 
-        for i, chunk in enumerate(
-            lazy_chunked_generator(
-                self._sync_records(context, write_messages=False),
-                self.batch_size,
-            ),
-            start=1,
-        ):
-            filename = f"{prefix}{sync_id}-{i}.json.gz"
-            with batch_config.storage.fs() as fs:
-                with fs.open(filename, "wb") as f:
-                    # TODO: Determine compression from config.
-                    with gzip.GzipFile(fileobj=f, mode="wb") as gz:
-                        gz.writelines(
-                            (json.dumps(record, cls=CustomJSONEncoder) + "\n").encode() for record in chunk
-                        )
-                file_url = fs.geturl(filename)
+    #     Developers are encouraged to override this method to customize batching
+    #     behavior for databases, bulk APIs, etc.
 
-            yield batch_config.encoding, [file_url]
+    #     Args:
+    #         batch_config: Batch config for this stream.
+    #         context: Stream partition or context dictionary.
+
+    #     Yields:
+    #         A tuple of (encoding, manifest) for each batch.
+    #     """
+    #     sync_id = f"{self.tap_name}--{self.name}-{uuid4()}"
+    #     prefix = batch_config.storage.prefix or ""
+
+    #     for i, chunk in enumerate(
+    #         lazy_chunked_generator(
+    #             self._sync_records(context, write_messages=False),
+    #             self.batch_size,
+    #         ),
+    #         start=1,
+    #     ):
+    #         filename = f"{prefix}{sync_id}-{i}.json.gz"
+    #         with batch_config.storage.fs() as fs:
+    #             with fs.open(filename, "wb") as f:
+    #                 # TODO: Determine compression from config.
+    #                 with gzip.GzipFile(fileobj=f, mode="wb") as gz:
+    #                     gz.writelines(
+    #                         (json.dumps(record, cls=CustomJSONEncoder) + "\n").encode() for record in chunk
+    #                     )
+    #             file_url = fs.geturl(filename)
+
+    #         yield batch_config.encoding, [file_url]

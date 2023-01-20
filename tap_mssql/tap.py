@@ -13,11 +13,12 @@ class Tapmssql(SQLTap):
     default_stream_class = mssqlStream
 
     config_jsonschema = th.PropertiesList(
-        th.Property(
-            "dialect",
-            th.StringType,
-            description="The Dialect of SQLAlchamey"
-        ),
+        # th.Property(
+        #     "dialect",
+        #     th.StringType,
+        #     th.default 
+        #     description="The Dialect of SQLAlchamey"
+        # ),
         th.Property(
             "driver_type",
             th.StringType,
