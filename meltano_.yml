@@ -14,7 +14,13 @@ plugins:
     - discover
     - state
   settings: 
-  - name: 
+  - name: driver_type
+  - name: host
+  - name: database
+  - name: password
+    kind: password
+  - name: start_date
+    value: '2020-01-01T00:00:00Z'
   loaders:
   - name: "target-s3parquet"
     namespace: "target_s3parquet"
