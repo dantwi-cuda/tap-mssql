@@ -169,20 +169,20 @@ class mssqlStream(SQLStream):
                 f"Stream '{self.name}' does not support partitioning."
             )
         
-        # table = self.connector.get_table(self.fully_qualified_name)
-        # query = table.select()
-        # if self.replication_key:
-        #     replication_key_col = table.columns[self.replication_key]
-        #     query = query.order_by(replication_key_col)
+        table = self.connector.get_table(self.fully_qualified_name)
+        query = table.select()
+        if self.replication_key:
+            replication_key_col = table.columns[self.replication_key]
+            query = query.order_by(replication_key_col)
 
-        #     start_val = self.get_starting_replication_key_value(partition)
-        #     if start_val:
-        #         query = query.filter(replication_key_col >= start_val)
+            start_val = self.get_starting_replication_key_value(partition)
+            if start_val:
+                query = query.filter(replication_key_col >= start_val)
 
-        # for row in self.connector.connection.execute(query):
-        #     yield dict(row)
+        for row in self.connector.connection.execute(query):
+            yield dict(row)
 
-        yield from super().get_records(partition)
+        #yield from super().get_records(partition)
 
     # def get_batches(
     #     self,
