@@ -3,7 +3,8 @@
 This includes mssqlStream and mssqlConnector.
 """
 from __future__ import annotations
-
+from dateutil.parser import parse
+import maya
 import gzip
 import json
 from datetime import datetime
@@ -147,7 +148,19 @@ class mssqlStream(SQLStream):
     """Stream class for mssql streams."""
 
     connector_class = mssqlConnector
+    def is_date(self,string, fuzzy=False):
+        """
+            Return whether the string can be interpreted as a date.
 
+            :param string: str, string to check for date
+            :param fuzzy: bool, ignore unknown tokens in string if True
+        """
+        try: 
+            parse(string, fuzzy=fuzzy)
+            return True
+
+        except ValueError:
+            return False
     def get_records(self, partition: Optional[dict]) -> Iterable[Dict[str, Any]]:
         """Return a generator of record-type dictionary objects.
 
@@ -176,6 +189,10 @@ class mssqlStream(SQLStream):
             query = query.order_by(replication_key_col)
 
             start_val = self.get_starting_replication_key_value(partition)
+            if self.is_date(start_val)==True:
+                startdate=maya.parse(start_val).datetime()
+                start_val=startdate.strftime('%y-%m-%d %H:%M:%S')
+                
             self.logger.debug("The Start Val is {start_val}")
             if start_val:
                 query = query.filter(replication_key_col >= start_val)
