@@ -190,7 +190,7 @@ class mssqlStream(SQLStream):
             start_val = self.get_starting_replication_key_value(partition)
             if self.is_date(start_val)==True:
                 startdate=parse(start_val,fuzzy=False)
-                start_val=startdate.strftime('%y-%m-%d %H:%M:%S')
+                start_val=startdate.strftime('%Y-%m-%d %H:%M:%S')
 
             self.logger.debug("The Start Val is {start_val}")
             if start_val:
