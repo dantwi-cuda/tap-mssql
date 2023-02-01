@@ -176,6 +176,7 @@ class mssqlStream(SQLStream):
             query = query.order_by(replication_key_col)
 
             start_val = self.get_starting_replication_key_value(partition)
+            self.logger.debug("The Start Val is {start_val}")
             if start_val:
                 query = query.filter(replication_key_col >= start_val)
 
