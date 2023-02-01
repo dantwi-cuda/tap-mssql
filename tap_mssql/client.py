@@ -4,7 +4,6 @@ This includes mssqlStream and mssqlConnector.
 """
 from __future__ import annotations
 from dateutil.parser import parse
-import maya
 import gzip
 import json
 from datetime import datetime
@@ -190,9 +189,9 @@ class mssqlStream(SQLStream):
 
             start_val = self.get_starting_replication_key_value(partition)
             if self.is_date(start_val)==True:
-                startdate=maya.parse(start_val).datetime()
+                startdate=parse(start_val,fuzzy=False)
                 start_val=startdate.strftime('%y-%m-%d %H:%M:%S')
-                
+
             self.logger.debug("The Start Val is {start_val}")
             if start_val:
                 query = query.filter(replication_key_col >= start_val)
